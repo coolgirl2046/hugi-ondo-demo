@@ -1,0 +1,217 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>후기온도 시연 데모</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 파이프라인 순서(판별 → 온도차). 따뜻한 색 = 협찬, 차가운 색 = 표시 없음 */
+:root{
+  --bg:#f6f2eb; --panel:#ffffff; --fg:#292521; --muted:#71665d; --line:#ddd3c6;
+  --warm:#d9542b; --warm-soft:#fbe6dd; --cool:#796149; --cool-soft:#eee4d6;
+  --ok:#65714d; --ok-soft:#e7eadc; --hold:#a57a00; --hold-soft:#f6ecc9;
+  --font:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#211d19; --panel:#2c2621; --fg:#f1e9dd; --muted:#b8aa99; --line:#51463c;
+  --warm:#f07a52; --warm-soft:#3a2219; --cool:#6ea6e6; --cool-soft:#182a3f;
+  --ok:#5cc489; --ok-soft:#17301f; --hold:#e0b53e; --hold-soft:#33290d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#211d19; --panel:#2c2621; --fg:#f1e9dd; --muted:#b8aa99; --line:#51463c;
+  --warm:#f07a52; --warm-soft:#3a2219; --cool:#6ea6e6; --cool-soft:#182a3f;
+  --ok:#5cc489; --ok-soft:#17301f; --hold:#e0b53e; --hold-soft:#33290d; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.65}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1{font-size:1.75rem;font-weight:800;margin:0;text-wrap:balance}
+h2{font-size:1.2rem;font-weight:800;margin:0;text-wrap:balance}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.note{font-size:.85rem;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+header{display:grid;gap:10px}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.85rem}
+.flow span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.flow i{color:var(--muted);font-style:normal}
+section.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:16px;min-width:0}
+.step{font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.cols>*{min-width:0}
+label{font-weight:700;font-size:.9rem;display:block;margin-bottom:4px}
+input[type=text],textarea,select{width:100%;box-sizing:border-box;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+textarea{min-height:170px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:700;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:8px 14px;cursor:pointer}
+button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;font-size:.9rem}
+.pill{display:inline-block;font-weight:800;border-radius:999px;padding:3px 12px;font-size:.9rem}
+.p-spon{background:var(--warm-soft);color:var(--warm)}
+.p-none{background:var(--cool-soft);color:var(--cool)}
+.p-cert{background:var(--ok-soft);color:var(--ok)}
+.p-hold{background:var(--hold-soft);color:var(--hold)}
+.result{display:grid;gap:12px}
+.scores{display:grid;gap:6px;font-size:.85rem}
+.bar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.bar>div{height:100%}
+.ev{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.ev li{font-size:.9rem;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+mark{background:var(--warm-soft);color:var(--warm);font-weight:700;padding:0 2px;border-radius:3px}
+mark.weak{background:var(--hold-soft);color:var(--hold)}
+mark.neg{background:var(--cool-soft);color:var(--cool)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:.8rem;color:var(--muted);font-weight:700}
+.duo{display:grid;gap:4px;min-width:150px}
+.duo .bar>div.w{background:var(--warm)}
+.duo .bar>div.c{background:var(--cool)}
+.lv{font-weight:800}
+.lv.big{color:var(--warm)}
+.summary{font-size:1.02rem;font-weight:500;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.list{display:grid;gap:8px}
+.rv{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:4px;background:var(--bg)}
+.rv .t{font-weight:700}
+.rv .b{font-size:.85rem;color:var(--muted);white-space:pre-line}
+.rv .aspects{font-size:.8rem;display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:6px;padding:0 6px}
+details summary{cursor:pointer;font-weight:700}
+@media (prefers-reduced-motion:no-preference){.bar>div{transition:width .3s}}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="step">시연용 데모 · 규칙 기반 · 가상 데이터</p>
+  <h1>후기온도 시연 데모</h1>
+  <p class="muted">선정한 한 상품으로 핵심 흐름을 검증하는 규칙 기반 시제품입니다. 실제 AI·OCR·URL 수집은 연결하지 않았습니다. 후기 한 편을 넣으면 협찬 표시를 찾아 분류하고, 같은 상품 후기들을 모아 협찬 후기와 표시 없는 후기의 온도차를 계산합니다.</p>
+  <div class="flow" aria-label="처리 순서">
+    <span>① 후기 텍스트 입력</span><i>→</i><span>② 협찬 표시 찾기</span><i>→</i><span>③ 라벨 통일</span><i>→</i><span>④ 근거 확인·판정 보류</span><i>→</i><span>⑤ 항목별 긍정·부정</span><i>→</i><span>⑥ 온도차 계산·요약</span>
+  </div>
+</header>
+
+<section class="panel" aria-labelledby="s1">
+  <p class="step">1단계 · 후기 한 편 판별</p>
+  <h2 id="s1">후기를 넣으면 협찬 표시를 찾아 나눕니다</h2>
+  <div class="cols">
+    <div style="display:grid;gap:12px">
+      <div>
+        <label for="sample">예시 후기 불러오기</label>
+        <select id="sample"></select>
+      </div>
+      <div>
+        <label class="check"><input type="checkbox" id="sameproduct"> 이 글은 가상 롱웨어 쿠션 후기입니다</label><p class="small muted">현재 상품명 자동 매칭은 없습니다. 같은 상품임을 직접 확인한 후기만 추가합니다.</p><label for="title">글 제목</label>
+        <input type="text" id="title">
+      </div>
+      <div>
+        <label for="body">본문 (줄바꿈으로 문장 구분)</label>
+        <textarea id="body"></textarea>
+      </div>
+      <label class="check" for="cert"><input type="checkbox" id="cert"> 증빙 상품 정보 일치 배지 미리보기 (후속 기능·시연 가정)</label>
+      <div class="row">
+        <button class="primary" id="run">판별하기</button>
+        <button id="add">지정 상품 후기에 추가</button><button id="reset">초기 데이터로 되돌리기</button>
+      </div>
+      <p class="small muted" id="addmsg" aria-live="polite"></p>
+    </div>
+    <div class="result" id="result" aria-live="polite"></div>
+  </div>
+  <p class="note">실제 서비스는 사진 속 배너도 OCR로 읽고, 모호한 문구는 학습한 언어모델로 판단합니다. 이 데모는 글자만 읽고, 정해 둔 문구 규칙으로 판단합니다.</p>
+</section>
+
+<section class="panel" aria-labelledby="s2">
+  <p class="step">2단계 · 상품별 온도차</p>
+  <h2 id="s2">같은 상품 후기를 모아 항목별로 비교합니다</h2>
+  <p class="muted small">상품: <b>가상 롱웨어 쿠션</b> · 아래 후기는 모두 시연용으로 만든 가상 후기이며, 위에서 추가한 후기도 함께 계산됩니다.</p>
+  <div class="row small" id="counts"></div>
+  <div class="tbl"><table id="temp"></table></div>
+  <div class="summary" id="summary"></div>
+  <p class="note">비교 규칙: 한 항목을 언급한 후기가 양쪽 모두 3개 이상일 때만 온도차를 보여줍니다. ‘확인 필요’ 후기는 비교에서 뺍니다. 차이 10%p 미만은 작음, 30%p 미만은 보통, 그 이상은 큼입니다. 이 구간과 최소 3건은 시연 설정이며 통계적 신뢰 기준이 아닙니다. 긍정 비율은 긍정 건수 ÷ 해당 항목 언급 건수이며, 중립·혼합·판단 불가도 분모에 포함하고 별도 표시합니다. 현재 요약은 계산값으로 만든 정형 문장입니다. 향후 AI 요약에도 근거 후기와 표본 수를 연결합니다. 증빙 표시는 협찬 여부와 별개이며 구매·정직성 보증이 아닙니다.</p>
+  <details>
+    <summary>후기별 분류 결과 보기</summary>
+    <div class="list" id="list" style="margin-top:10px"></div>
+  </details>
+</section>
+</div>
+
+<script>
+// 규칙 기반 교육용 시제품. 점수는 확률이 아니며 수치 오차 epsilon을 사용하지 않습니다.
+const STRONG=[/소정의\s*원고료/,/원고료/,/제품을\s*(?:무상으로\s*)?제공받|제공받아|제공받았/,/체험단/,/파트너스\s*활동|수수료를\s*제공받|일정액의\s*수수료/,/#협찬|\[협찬\]|협찬/,/#광고|\[광고\]|유료\s*광고|광고\s*포함/];
+const WEAK=/지원받|도움을?\s*받아|선물받|초대받/;
+const DENY=/협찬\s*(?:아님|아닙니다|아니에요|없이|X|x)|광고\s*(?:아님|아닙니다|아니에요)|(?:원고료|제품|수수료)[^.!?\n]{0,12}(?:안\s*받|받지\s*않)/;
+function classify(title,body,certified){
+ const lines=[title,...body.split(/\n/)];const ev=[];let strong=0,weak=0,denied=false;
+ lines.forEach((line,i)=>{
+  const pos=i===0?'제목':i===1?'본문 첫 줄':i===lines.length-1?'글 끝':`본문 ${i}번째 줄`;
+  line.split(/[.!?。]|[,，]|하지만|그러나/).filter(s=>s.trim()).forEach(s=>{
+   const denial=s.match(DENY);if(denial){denied=true;ev.push({pos,text:s,kind:'작성자 부인 표현'});s=s.replace(denial[0],'');}
+   if(/협찬이라는|협찬\s*표시|광고\s*문구/.test(s)){weak++;ev.push({pos,text:s,kind:'문구 설명일 수 있어 확인 필요'});return;}
+   if(STRONG.some(re=>re.test(s))){strong++;ev.push({pos,text:s,kind:'명시적 대가성 표현'});}
+   else if(WEAK.test(s)){weak++;ev.push({pos,text:s,kind:'모호한 표현'});}
+  });
+ });
+ // 부인과 제공 근거가 함께 있으면 문맥 확인을 위해 보류합니다.
+ const label=strong&&denied?'확인 필요':strong?'협찬 표시':weak?'확인 필요':'표시 없음';
+ return {label,ev,denied,cert:!!certified};
+}
+const ASPECTS={'향':['향'],'지속력':['지속력'],'가격':['가격','가성비']};
+function sentiment(t){
+ const negated=/(?:좋|괜찮|만족)[^,.!?]{0,5}(?:않|못)|안\s*좋/.test(t);
+ const negative=negated||/아쉬|별로|짧|강해|비싸|비싼|부담|지워|들뜨|무너|나쁘|나빠|불만족/.test(t);
+ const clean=t.replace(/(?:좋|괜찮|만족)[^,.!?]{0,5}(?:않|못)/g,'').replace(/안\s*좋/g,'').replace(/불만족/g,'');
+ const positive=/좋|만족|은은|괜찮|최고|훌륭|착한|그대로/.test(clean);
+ if(negative&&positive)return '중립·혼합';if(negative)return '부정';if(positive)return '긍정';
+ return /보통|무난|그저|그냥|중립/.test(t)?'중립·혼합':'판단 불가';
+}
+function aspects(body){
+ const found={};
+ body.split(/[\n.!?]/).forEach(sent=>{
+  const hits=[];for(const [a,keys] of Object.entries(ASPECTS)){const ix=Math.min(...keys.map(k=>sent.indexOf(k)).filter(i=>i>=0));if(Number.isFinite(ix))hits.push({a,ix});}
+  hits.sort((a,b)=>a.ix-b.ix);
+  hits.forEach((h,i)=>{const s=sent.slice(i===0?0:h.ix,i+1<hits.length?hits[i+1].ix:sent.length);(found[h.a]??=[]).push(sentiment(s));});
+ });
+ const out={};for(const[a,vals]of Object.entries(found)){const known=vals.filter(v=>v!=='판단 불가');out[a]=!known.length?'판단 불가':new Set(known).size===1?known[0]:'중립·혼합';}return out;
+}
+const SAMPLES = [
+  {t:"[협찬] 롱웨어 쿠션 2주 사용 후기", b:"향이 은은해서 좋았어요.\n지속력이 훌륭해서 저녁까지 그대로였어요.\n가격도 이 정도면 착한 편이에요.", c:false},
+  {t:"롱웨어 쿠션 솔직 리뷰", b:"소정의 원고료를 받아 작성한 글입니다.\n향이 은은하고 좋아요.\n지속력 최고예요.\n가격 대비 만족합니다.", c:false},
+  {t:"여름 쿠션 추천", b:"향은 무난하게 괜찮아요.\n지속력이 좋아서 수정 화장이 필요 없었어요.\n#협찬 #광고", c:false},
+  {t:"데일리 쿠션 리뷰", b:"지속력이 정말 좋아요.\n향이 조금 강해서 아쉬웠어요.\n가격은 만족스러워요.\n이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.", c:false},
+  {t:"롱웨어 쿠션 체험단 후기", b:"체험단으로 제품을 제공받아 사용해 봤어요.\n향 좋아요.\n지속력도 만족해요.", c:false},
+  {t:"롱웨어 쿠션 내돈내산 후기", b:"협찬 아님, 직접 샀어요.\n향은 은은해서 좋아요.\n그런데 지속력이 짧아서 오후면 다 지워져요.\n가격도 비싼 편이라 재구매는 고민돼요.", c:true},
+  {t:"쿠션 3통째 쓰는 중", b:"향이 좋아요.\n지속력은 좋은 편이라 만족해요.\n가격은 세일 때 사면 괜찮아요.", c:false},
+  {t:"롱웨어 쿠션 한 달 사용", b:"지속력이 아쉬워요. 점심 지나면 들뜨기 시작해요.\n향은 무난하고 괜찮아요.", c:true},
+  {t:"롱웨어 쿠션 별로였던 점", b:"지속력이 짧아요.\n향이 강해서 별로였어요.\n가격은 비싸요.", c:false},
+  {t:"지성 피부 쿠션 후기", b:"지속력은 기대보다 짧았어요.\n향은 은은해서 좋아요.\n가성비는 괜찮아요.", c:false},
+  {t:"롱웨어 쿠션 후기", b:"향 좋아요.\n지속력은 그냥 그래요, 좀 아쉬워요.", c:false},
+  {t:"롱웨어 쿠션 사용기", b:"브랜드에서 지원받아 써봤어요.\n지속력 좋아요.", c:false}
+];
+
+let reviews=SAMPLES.map(s=>({...s}));
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pillClass=l=>({'협찬 표시':'p-spon','표시 없음':'p-none','확인 필요':'p-hold'}[l]);
+function renderResult(){
+ const t=$('title').value.trim(),b=$('body').value.trim();if(!t&&!b){$('result').textContent='제목이나 본문을 입력해 주세요.';return;}
+ const r=classify(t,b,$('cert').checked),a=aspects(b);
+ const why=r.label==='협찬 표시'?'대가성 표시 문구를 찾았습니다.':r.label==='확인 필요'?'모호하거나 상충하는 표현이 있어 판단을 보류합니다.':'협찬 표시 문구를 찾지 못했습니다. 실구매 또는 비협찬을 뜻하지 않습니다.';
+ $('result').innerHTML=`<div><span class="pill ${pillClass(r.label)}">${r.label}</span></div><p>${why}</p>${r.cert?'<p class="note">증빙 상품 정보 일치 · 시연 가정입니다. 실제 영수증 검증이나 작성자 본인 확인은 하지 않습니다.</p>':''}<ul class="ev">${r.ev.map(e=>`<li><b>${e.pos}</b> · ${e.kind}<br>${esc(e.text)}</li>`).join('')}</ul><p class="small">항목별 평가: ${Object.entries(a).map(([k,v])=>`${k} ${v}`).join(' · ')||'항목 언급 없음'}</p><p class="note">정해진 표현만 처리하는 규칙 데모입니다. 입력 문맥에 따라 오판할 수 있으며 모델 정확도를 의미하지 않습니다.</p>`;
+}
+function stats(g,a){const m=g.filter(r=>Object.hasOwn(r.asp,a));const p=m.filter(r=>r.asp[a]==='긍정').length;return {n:m.length,p,pct:m.length?p/m.length*100:null,neutral:m.filter(r=>r.asp[a]==='중립·혼합').length,unknown:m.filter(r=>r.asp[a]==='판단 불가').length};}
+function analysis(data){const rows=data.map(r=>({...r,cls:classify(r.t,r.b,r.c),asp:aspects(r.b)}));const s=rows.filter(r=>r.cls.label==='협찬 표시'),n=rows.filter(r=>r.cls.label==='표시 없음');const metrics=Object.keys(ASPECTS).map(a=>{const sp=stats(s,a),np=stats(n,a);return {a,s:sp,n:np,d:sp.n>=3&&np.n>=3?Math.abs(sp.pct-np.pct):null};});return {rows,s,n,metrics};}
+const fmt=x=>x===null?'—':x.toFixed(1);
+function summaryOf(metrics){const valid=metrics.filter(m=>m.d!==null);if(!valid.length)return '비교할 후기가 부족합니다. 차이가 없다는 뜻이 아닙니다.';const best=valid.reduce((a,b)=>a.d>=b.d?a:b);return `가상 데이터에서 ${best.a}의 긍정 비율은 협찬 표시 ${best.s.p}/${best.s.n}건(${fmt(best.s.pct)}%), 표시 없음 ${best.n.p}/${best.n.n}건(${fmt(best.n.pct)}%)입니다. 차이는 ${fmt(best.d)}%p입니다. ${best.d<10?'비교 가능한 항목 모두 시연 기준상 차이가 작습니다.':'비교 가능한 항목 중 차이가 가장 큽니다.'} 협찬이 차이의 원인이라는 의미는 아닙니다.`;}
+function renderTemp(){const r=analysis(reviews);$('counts').textContent=`총 ${r.rows.length}건 · 협찬 표시 ${r.s.length} · 표시 없음 ${r.n.length} · 확인 필요 ${r.rows.length-r.s.length-r.n.length} (비교 제외)`;
+ const cell=s=>`긍정 ${s.p}/${s.n}건 (${fmt(s.pct)}%)<br><small>중립·혼합 ${s.neutral} · 판단 불가 ${s.unknown}</small>`;
+ $('temp').innerHTML='<tr><th>항목</th><th>협찬 표시</th><th>표시 없음</th><th>온도차</th></tr>'+r.metrics.map(m=>`<tr><td>${m.a}</td><td>${cell(m.s)}</td><td>${cell(m.n)}</td><td>${m.d===null?'후기 부족':`${fmt(m.d)}%p · ${m.d<10?'작음':m.d<30?'보통':'큼'}`}</td></tr>`).join('');$('summary').textContent=summaryOf(r.metrics);
+ $('list').innerHTML=r.rows.map((x,i)=>`<div class="rv" id="review-${i+1}"><b>예시 ${i+1} · ${esc(x.t)}</b><span>${x.cls.label}</span><div class="b">${esc(x.b)}</div><div class="small">${Object.entries(x.asp).map(([a,v])=>`${a} ${v}`).join(' · ')}</div></div>`).join('');
+}
+function duplicate(t,b){const norm=s=>s.replace(/\s+/g,'').toLowerCase();return reviews.some(r=>norm(r.b)===norm(b)&&norm(b)!=='');}
+function addReview(t,b,c,same){if(!b.trim())return '본문을 입력해 주세요.';if(!same)return '지정 상품 후기인지 먼저 확인해 주세요.';if(duplicate(t,b))return '이미 있는 후기입니다. 중복 추가하지 않았습니다.';reviews.push({t:t||'(제목 없음)',b,c});return '추가했습니다. 새로고침하면 초기화되며 외부 전송·저장하지 않습니다.';}
+// UI binding
+const sel=$('sample');SAMPLES.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`예시 ${i+1}: ${s.t}`;sel.appendChild(o);});
+function load(i){const s=SAMPLES[i];$('title').value=s.t;$('body').value=s.b;$('cert').checked=s.c;$('sameproduct').checked=true;renderResult();}
+sel.addEventListener('change',()=>load(+sel.value));$('run').addEventListener('click',renderResult);
+$('add').addEventListener('click',()=>{$('addmsg').textContent=addReview($('title').value.trim(),$('body').value.trim(),$('cert').checked,$('sameproduct').checked);renderTemp();});
+$('reset').addEventListener('click',()=>{reviews=SAMPLES.map(s=>({...s}));load(3);sel.value=3;$('addmsg').textContent='초기 가상 후기 12건으로 되돌렸습니다.';renderTemp();});sel.value=3;load(3);renderTemp();
+</script>
+
+</body></html>
